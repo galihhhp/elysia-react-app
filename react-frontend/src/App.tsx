@@ -3,6 +3,8 @@ import "./App.css";
 import { useTaskManager } from "./hooks/useTaskManager";
 import { loadConfig } from "./config";
 
+const VERSION = import.meta.env.VITE_APP_VERSION;
+
 function App() {
   const {
     message,
@@ -20,7 +22,6 @@ function App() {
     handleEditTask,
     handleDeleteTask,
   } = useTaskManager();
-  const [tasksVisible, setTasksVisible] = useState(false);
   const [featureEditTask, setFeatureEditTask] = useState(false);
   const [featureDeleteTask, setFeatureDeleteTask] = useState(false);
 
@@ -29,12 +30,8 @@ function App() {
       setFeatureEditTask(cfg.featureEditTask);
       setFeatureDeleteTask(cfg.featureDeleteTask);
     });
-  }, []);
-
-  const handleShowTasks = () => {
     getTasks();
-    setTasksVisible(true);
-  };
+  }, [getTasks]);
 
   return (
     <>
@@ -55,62 +52,57 @@ function App() {
         </form>
       </div>
 
-      {!tasksVisible ? (
-        <button onClick={handleShowTasks}>Show Tasks</button>
-      ) : (
-        <>
-          <h2>Tasks</h2>
-          <ul>
-            {tasks.length > 0 ? (
-              tasks.map((task) => (
-                <li key={task.id}>
-                  {editTaskId === task.id ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editTaskValue}
-                        onChange={(e) => setEditTaskValue(e.target.value)}
-                        aria-label="Edit task input"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleEditTask(task.id)}
-                        type="button">
-                        Save
-                      </button>
-                      <button onClick={cancelEditTask} type="button">
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {task.task}
-                      {featureEditTask && (
-                        <button
-                          onClick={() => startEditTask(task.id, task.task)}
-                          type="button"
-                          style={{ marginLeft: 8 }}>
-                          Edit
-                        </button>
-                      )}
-                      {featureDeleteTask && (
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          type="button"
-                          style={{ marginLeft: 8 }}>
-                          Delete
-                        </button>
-                      )}
-                    </>
+      <h2>Tasks</h2>
+      <ul>
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <li key={task.id}>
+              {editTaskId === task.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editTaskValue}
+                    onChange={(e) => setEditTaskValue(e.target.value)}
+                    aria-label="Edit task input"
+                    autoFocus
+                  />
+                  <button onClick={() => handleEditTask(task.id)} type="button">
+                    Save
+                  </button>
+                  <button onClick={cancelEditTask} type="button">
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  {task.task}
+                  {featureEditTask && (
+                    <button
+                      onClick={() => startEditTask(task.id, task.task)}
+                      type="button"
+                      style={{ marginLeft: 8 }}>
+                      Edit
+                    </button>
                   )}
-                </li>
-              ))
-            ) : (
-              <li>No tasks yet.</li>
-            )}
-          </ul>
-        </>
-      )}
+                  {featureDeleteTask && (
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      type="button"
+                      style={{ marginLeft: 8 }}>
+                      Delete
+                    </button>
+                  )}
+                </>
+              )}
+            </li>
+          ))
+        ) : (
+          <li>No tasks yet.</li>
+        )}
+      </ul>
+      <footer style={{ marginTop: 32, opacity: 0.6, fontSize: 14 }}>
+        Frontend version: {VERSION}
+      </footer>
     </>
   );
 }
