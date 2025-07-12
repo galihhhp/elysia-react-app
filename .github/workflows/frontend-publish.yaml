@@ -21,11 +21,12 @@ jobs:
 
       - name: Extract version from package.json
         id: pkg
+        working-directory: react-frontend
         run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./react-frontend
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/react-frontend:${{ env.VERSION }}

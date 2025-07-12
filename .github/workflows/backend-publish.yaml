@@ -21,11 +21,12 @@ jobs:
 
       - name: Extract version from package.json
         id: pkg
+        working-directory: elysia-backend
         run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./elysia-backend
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elysia-backend:${{ env.VERSION }}
