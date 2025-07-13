@@ -12,6 +12,7 @@ const COLUMN_TASK = process.env.DB_COLUMN_TASK || "task";
 
 type DatabaseOperation =
   | "SELECT_TASKS"
+  | "SELECT_TASK_BY_ID"
   | "INSERT_TASK"
   | "UPDATE_TASK"
   | "DELETE_TASK";
@@ -110,15 +111,14 @@ const handleDatabaseError = (
   set.status = 500;
   return {
     success: false as const,
-    message: `Failed to ${
-      operation.toLowerCase().includes("select")
-        ? "fetch"
-        : operation.toLowerCase().includes("update")
+    message: `Failed to ${operation.toLowerCase().includes("select")
+      ? "fetch"
+      : operation.toLowerCase().includes("update")
         ? "edit"
         : operation.toLowerCase().includes("delete")
-        ? "delete"
-        : "add"
-    } task${operation.toLowerCase().includes("select") ? "s" : ""}`,
+          ? "delete"
+          : "add"
+      } task${operation.toLowerCase().includes("select") ? "s" : ""}`,
     error: errorMessage,
   };
 };
@@ -162,52 +162,78 @@ const app = new Elysia()
     });
   })
   .get("/", () => ({ message: "Hello from ElysiaJS!" }))
-  .get("/tasks", async ({ set }) => {
+  .get("/tasks", async ({ set, request }) => {
+    const start = Date.now();
+    logger.info("GET /tasks called", { method: request.method, url: request.url });
     const result = await executeQuery<Array<{ id: number; task: string }>>(
       "SELECT_TASKS",
       `SELECT ${COLUMN_ID}, ${COLUMN_TASK} FROM ${TABLE} ORDER BY ${COLUMN_ID} ASC`,
       [],
       set
     );
-
+    const duration = Date.now() - start;
     if (result.success) {
+      logger.info("Tasks fetched", { count: result.data.length, duration });
       return { success: true, tasks: result.data };
     }
+    logger.error("Failed to fetch tasks", { error: result.error, duration });
     return result;
   })
-  .post("/tasks", async ({ body, set }) => {
+  .get("/tasks/:id", async ({ params, set, request }) => {
+    const { id } = params as { id: string };
+    const start = Date.now();
+    logger.info("GET /tasks/:id called", { id, method: request.method, url: request.url });
+    const result = await executeQuery<Array<{ id: number; task: string }>>(
+      "SELECT_TASK_BY_ID",
+      `SELECT ${COLUMN_ID}, ${COLUMN_TASK} FROM ${TABLE} WHERE ${COLUMN_ID} = $1`,
+      [id],
+      set
+    );
+    const duration = Date.now() - start;
+    if (result.success && result.data.length > 0) {
+      logger.info("Task found", { id, task: result.data[0], duration });
+      return { success: true, task: result.data[0] };
+    }
+    logger.warn("Task not found", { id, duration });
+    set.status = 404;
+    return { success: false, message: "Task not found" };
+  })
+  .post("/tasks", async ({ body, set, request }) => {
+    const start = Date.now();
+    logger.info("POST /tasks called", { body, method: request.method, url: request.url });
     const { task } = body as { task?: string };
-
     if (!task) {
       set.status = 400;
+      logger.warn("Task is required", { body });
       return { success: false, message: "Task is required" };
     }
-
     const result = await executeQuery<Array<{ id: number; task: string }>>(
       "INSERT_TASK",
       `INSERT INTO ${TABLE}(${COLUMN_TASK}) VALUES($1) RETURNING ${COLUMN_ID}, ${COLUMN_TASK}`,
       [task],
       set
     );
-
+    const duration = Date.now() - start;
     if (result.success) {
-      return {
-        success: true,
-        message: "Task added successfully",
-        task: result.data[0],
-      };
+      logger.info("Task added", { task: result.data[0], duration });
+      return { success: true, message: "Task added successfully", task: result.data[0] };
     }
+    logger.error("Failed to add task", { error: result.error, duration });
     return result;
   })
-  .put("/tasks/:id", async ({ params, body, set }) => {
+  .put("/tasks/:id", async ({ params, body, set, request }) => {
     if (process.env.FEATURE_EDIT_TASK !== "true") {
       set.status = 403;
+      logger.warn("Edit task feature is disabled");
       throw new Error("Edit task feature is disabled");
     }
     const { id } = params as { id: string };
     const { task } = body as { task?: string };
+    const start = Date.now();
+    logger.info("PUT /tasks/:id called", { id, body, method: request.method, url: request.url });
     if (!task) {
       set.status = 400;
+      logger.warn("Task is required for edit", { id, body });
       return { success: false, message: "Task is required" };
     }
     const result = await executeQuery<Array<{ id: number; task: string }>>(
@@ -216,36 +242,37 @@ const app = new Elysia()
       [task, id],
       set
     );
+    const duration = Date.now() - start;
     if (result.success && result.data.length > 0) {
-      return {
-        success: true,
-        message: "Task updated successfully",
-        task: result.data[0],
-      };
+      logger.info("Task updated", { id, task: result.data[0], duration });
+      return { success: true, message: "Task updated successfully", task: result.data[0] };
     }
     set.status = 404;
+    logger.warn("Task not found for update", { id, duration });
     return { success: false, message: "Task not found" };
   })
-  .delete("/tasks/:id", async ({ params, set }) => {
+  .delete("/tasks/:id", async ({ params, set, request }) => {
     if (process.env.FEATURE_DELETE_TASK !== "true") {
       set.status = 403;
+      logger.warn("Delete task feature is disabled");
       throw new Error("Delete task feature is disabled");
     }
     const { id } = params as { id: string };
+    const start = Date.now();
+    logger.info("DELETE /tasks/:id called", { id, method: request.method, url: request.url });
     const result = await executeQuery<Array<{ id: number }>>(
       "DELETE_TASK",
       `DELETE FROM ${TABLE} WHERE ${COLUMN_ID} = $1 RETURNING ${COLUMN_ID}`,
       [id],
       set
     );
+    const duration = Date.now() - start;
     if (result.success && result.data.length > 0) {
-      return {
-        success: true,
-        message: "Task deleted successfully",
-        id: result.data[0][COLUMN_ID],
-      };
+      logger.info("Task deleted", { id, duration });
+      return { success: true, message: "Task deleted successfully", id: result.data[0][COLUMN_ID] };
     }
     set.status = 404;
+    logger.warn("Task not found for delete", { id, duration });
     return { success: false, message: "Task not found" };
   })
   .listen(3000);
