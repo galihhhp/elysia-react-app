@@ -20,7 +20,8 @@ export const fetchTasks = async (): Promise<Task[]> => {
   if (!response.ok) {
     throw new Error("Failed to fetch tasks");
   }
-  return response.json();
+  const data = await response.json();
+  return data.tasks;
 };
 
 export const createTask = async (task: string): Promise<void> => {
